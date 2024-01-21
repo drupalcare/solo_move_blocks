@@ -1,0 +1,5 @@
+name: 'Solo Move Blocks'
+type: module
+description: 'A custom module to move blocks from W3CSS Theme or any sub-theme to Solo Theme.'
+package: Custom
+core_version_requirement: ^9 || ^10

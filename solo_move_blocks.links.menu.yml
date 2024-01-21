@@ -1,0 +1,6 @@
+solo_move_blocks.admin_form:
+  title: 'Migrate Blocks to Solo Theme'
+  description: 'Migrate blocks from the drupal8_w3css_theme to the solo theme.'
+  parent: system.admin_config_system
+  route_name: solo_move_blocks.admin_form
+  weight: 100

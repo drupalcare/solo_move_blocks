@@ -1,0 +1,129 @@
+<?php
+
+/**
+ * @file
+ * To migrate blocks to Solo Theme.
+ */
+
+/**
+ * Checks if a theme exists and is installed.
+ *
+ * @param string $theme_name
+ *   The machine name of the theme.
+ *
+ * @return bool
+ *   TRUE if the theme is installed, FALSE otherwise.
+ */
+function solo_move_blocks_theme_exists($theme_name) {
+  $theme_handler = \Drupal::service('theme_handler');
+  return $theme_handler->themeExists($theme_name);
+}
+
+/**
+ * Moves blocks and their configuration from one theme to another.
+ *
+ * @param string $source_theme
+ *   The machine name of the source theme.
+ * @param string $target_theme
+ *   The machine name of the target theme.
+ * @param string $default_region
+ *   The machine name of the default region in the target theme to assign blocks
+ *   to if their current region does not exist in the target theme.
+ */
+function _solo_move_blocks_move_blocks_and_config_between_themes($source_theme, $target_theme, $default_region = 'footer_menu') {
+  // Check if both the source and target themes are installed.
+  if (solo_move_blocks_theme_exists($source_theme) && solo_move_blocks_theme_exists($target_theme)) {
+    // Delete blocks from the 'solo' theme.
+    solo_move_blocks__solo_remove_all_blocks('solo');
+
+    $block_storage = \Drupal::entityTypeManager()->getStorage('block');
+    $blocks = $block_storage->loadByProperties(['theme' => $source_theme]);
+
+    // Sort blocks by weight.
+    uasort($blocks, function ($a, $b) {
+        $weight_a = $a->get('weight');
+        $weight_b = $b->get('weight');
+        return ($weight_a == $weight_b) ? 0 : (($weight_a < $weight_b) ? -1 : 1);
+    });
+
+    $blocks_migrated = 0;
+    foreach ($blocks as $block_id => $block) {
+      // Check if the block is disabled in the source theme.
+      $is_disabled = $block->get('status') === 0;
+
+      $current_region = $block->getRegion();
+      $target_theme_regions = system_region_list($target_theme, REGIONS_ALL);
+
+      // Handle the specific case for region mapping.
+      if ($current_region === 'fixed_search_bar' && isset($target_theme_regions['fixed_search_block'])) {
+        $new_region = 'fixed_search_block';
+      }
+      elseif ($current_region === 'bottom_forth' && isset($target_theme_regions['bottom_fourth'])) {
+        $new_region = 'bottom_fourth';
+      }
+      else {
+        // If the block's current region doesn't exist in the target theme, use
+        // the default region.
+        $new_region = isset($target_theme_regions[$current_region]) ? $current_region : $default_region;
+      }
+
+      // Create a new block configuration for the target theme.
+      $new_block_id = "{$target_theme}_{$block_id}";
+      if (!$block_storage->load($new_block_id)) {
+        $new_block_config = $block_storage->create([
+          'id' => $new_block_id,
+          'theme' => $target_theme,
+          'region' => $new_region,
+          'plugin' => $block->getPluginId(),
+          'settings' => $block->get('settings'),
+          'visibility' => $block->get('visibility'),
+        // Set the block weight.
+          'weight' => $block->get('weight'),
+        // Set the block status based on whether it's disabled.
+          'status' => $is_disabled ? 0 : 1,
+        ]);
+        $new_block_config->save();
+
+        $blocks_migrated++;
+      }
+      else {
+        \Drupal::logger('solo_move_blocks')->warning('Block @new_block_id already exists in @target_theme.', [
+          '@new_block_id' => $new_block_id,
+          '@target_theme' => $target_theme,
+        ]);
+      }
+    }
+
+    if ($blocks_migrated > 0) {
+      \Drupal::messenger()->addMessage("{$blocks_migrated} blocks have been migrated from {$source_theme} to {$target_theme}.");
+    }
+    else {
+      \Drupal::messenger()->addMessage("No blocks needed migration from {$source_theme} to {$target_theme}.");
+    }
+  }
+  else {
+    \Drupal::logger('solo_move_blocks')->error('Operation aborted because one or both of the themes are not installed. Source: @source, Target: @target', [
+      '@source' => $source_theme,
+      '@target' => $target_theme,
+    ]);
+    \Drupal::messenger()->addError('Operation aborted because one or both of the themes are not installed.');
+  }
+}
+
+/**
+ * Removes all blocks for a given theme.
+ *
+ * @param string $theme
+ *   The machine name of the theme.
+ */
+
+/**
+ * Removes all blocks for a given theme.
+ */
+function solo_move_blocks__solo_remove_all_blocks($theme) {
+  $block_storage = \Drupal::entityTypeManager()->getStorage('block');
+  $blocks = $block_storage->loadByProperties(['theme' => $theme]);
+  foreach ($blocks as $block) {
+    $block->delete();
+  }
+}

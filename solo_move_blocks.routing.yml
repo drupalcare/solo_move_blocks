@@ -1,0 +1,7 @@
+solo_move_blocks.admin_form:
+  path: '/admin/config/system/solo-move-blocks'
+  defaults:
+    _form: '\Drupal\solo_move_blocks\Form\SoloMoveBlocksForm'
+    _title: 'Migrate Blocks to Solo Theme'
+  requirements:
+    _permission: 'administer themes'
